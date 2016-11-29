@@ -1,10 +1,12 @@
 from bs4 import BeautifulSoup
 from urllib import request
 import sqlite3
+from multiprocessing.dummy import Pool as ThreadPool
 
 DB_PATH = 'data.sqlite'
 BASE_URL = 'http://www.graduateshotline.com/gre/load.php?file=list{}.html'
 UNKNOWN = '????????'
+THREAD_NUMBER = 100
 
 
 def get_rows():
@@ -20,15 +22,25 @@ def get_rows():
             definition = definition_td.text
             data.append({
                 'word': word.lower(),
-                'usage': get_usage(usage_url),
+                'usage_url': usage_url,
                 'definition': definition
             })
 
     return data
 
 
-def get_usage(url):
-    html = request.urlopen(url).read()
+def get_usage(word_usage_def):
+    url = word_usage_def['usage_url']
+    try:
+        html = request.urlopen(url).read()
+    except UnicodeEncodeError:
+        print(word_usage_def['word'], url)
+        return {
+            'word': word_usage_def['word'],
+            'definition': word_usage_def['definition'],
+            'usage': '',
+        }
+
     soup = BeautifulSoup(html)
     td = soup.find('td')
     for el in td.find_all('a') + list(td.find('h2')):
@@ -39,7 +51,19 @@ def get_usage(url):
 
     s = td.text
     s = s.replace('...', '\n').replace('>', '').strip()
-    return s
+    return {
+        'word': word_usage_def['word'],
+        'definition': word_usage_def['definition'],
+        'usage': s,
+    }
+
+
+def get_usages(data, thread_number=THREAD_NUMBER):
+    pool = ThreadPool(thread_number)
+    results = pool.map(get_usage, data, chunksize=int(len(data)/THREAD_NUMBER))
+    pool.close()
+    pool.join()
+    return [result for result in results if result]
 
 
 def ensure_db_setup(db_path=DB_PATH):
@@ -81,5 +105,6 @@ def to_db(data, db_path=DB_PATH):
 
 
 if __name__ == '__main__':
-    data = get_rows()
+    data_no_usage = get_rows()
+    data = get_usages(data_no_usage)
     to_db(data)
