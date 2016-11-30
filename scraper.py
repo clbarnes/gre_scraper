@@ -45,11 +45,14 @@ def get_usage(word_usage_def):
     for el in td.find_all('a') + list(td.find('h2')):
         el.extract()
 
-    for bold in td.find_all('b'):
-        bold.replace_with(UNKNOWN)
+    for ellipsis in td.find_all(text='...'):
+        ellipsis.replace_with('\n')
+
+    for word_usage in td.find_all(text=word_usage_def['word']):
+        word_usage.replace_with(UNKNOWN)
 
     s = td.text
-    s = s.replace('...', '\n').replace('>', '').strip()
+    s = s.replace('>', '').strip()
     return {
         'word': word_usage_def['word'],
         'definition': word_usage_def['definition'],
@@ -57,11 +60,15 @@ def get_usage(word_usage_def):
     }
 
 
-def get_usages(data, thread_number=THREAD_NUMBER):
-    pool = ThreadPool(thread_number)
-    results = pool.map(get_usage, data, chunksize=int(len(data)/THREAD_NUMBER))
-    pool.close()
-    pool.join()
+def get_usages(data, parallel=True, thread_number=THREAD_NUMBER):
+    if parallel:
+        pool = ThreadPool(thread_number)
+        results = pool.map(get_usage, data, chunksize=int(len(data)/THREAD_NUMBER))
+        pool.close()
+        pool.join()
+    else:
+        results = [get_usage(datum) for datum in data]
+
     return results
 
 
