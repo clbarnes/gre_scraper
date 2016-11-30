@@ -3,7 +3,6 @@ from urllib import request
 from multiprocessing.dummy import Pool as ThreadPool
 import json
 
-DB_PATH = 'data.sqlite'
 BASE_URL = 'http://www.graduateshotline.com/gre/load.php?file=list{}.html'
 UNKNOWN = '????????'
 THREAD_NUMBER = 100
@@ -13,7 +12,7 @@ def get_rows():
     data = []
     for i in range(1, 6):
         html = request.urlopen(BASE_URL.format(i)).read()
-        soup = BeautifulSoup(html)
+        soup = BeautifulSoup(html, 'html.parser')
         rows = soup.find_all('tr')
         for row in rows:
             word_td, definition_td = row.find_all('td')
@@ -41,7 +40,7 @@ def get_usage(word_usage_def):
             'usage': '',
         }
 
-    soup = BeautifulSoup(html)
+    soup = BeautifulSoup(html, 'html.parser')
     td = soup.find('td')
     for el in td.find_all('a') + list(td.find('h2')):
         el.extract()
