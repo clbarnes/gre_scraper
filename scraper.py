@@ -2,13 +2,17 @@ from bs4 import BeautifulSoup
 from urllib import request
 from multiprocessing.dummy import Pool as ThreadPool
 import json
+from math import inf
 
 BASE_URL = 'http://www.graduateshotline.com/gre/load.php?file=list{}.html'
 UNKNOWN = '????????'
 THREAD_NUMBER = 100
 
 
-def get_rows():
+def get_rows(limit=None):
+    if limit is None:
+        limit = inf
+    count = 0
     data = []
     for i in range(1, 6):
         html = request.urlopen(BASE_URL.format(i)).read()
@@ -24,6 +28,9 @@ def get_rows():
                 'usage_url': usage_url,
                 'definition': definition
             })
+            count += 1
+            if count >= limit:
+                return data
 
     return data
 
@@ -37,7 +44,7 @@ def get_usage(word_usage_def):
         return {
             'word': word_usage_def['word'],
             'definition': word_usage_def['definition'],
-            'usage': '',
+            'usages': []
         }
 
     soup = BeautifulSoup(html, 'html.parser')
@@ -45,18 +52,18 @@ def get_usage(word_usage_def):
     for el in td.find_all('a') + list(td.find('h2')):
         el.extract()
 
-    for ellipsis in td.find_all(text='...'):
-        ellipsis.replace_with('\n')
+    # for ellipsis in td.find_all(text='...'):
+    #     ellipsis.replace_with('LINEBREAK')
 
     for word_usage in td.find_all(text=word_usage_def['word']):
         word_usage.replace_with(UNKNOWN)
 
     s = td.text
-    s = s.replace('>', '').strip()
+    lst = [usage.strip() for usage in s.replace('>', '').split('...') if usage.split()]
     return {
         'word': word_usage_def['word'],
         'definition': word_usage_def['definition'],
-        'usage': s,
+        'usages': lst,
     }
 
 
