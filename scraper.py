@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 from urllib import request
-import sqlite3
 from multiprocessing.dummy import Pool as ThreadPool
+import json
 
 DB_PATH = 'data.sqlite'
 BASE_URL = 'http://www.graduateshotline.com/gre/load.php?file=list{}.html'
@@ -63,48 +63,11 @@ def get_usages(data, thread_number=THREAD_NUMBER):
     results = pool.map(get_usage, data, chunksize=int(len(data)/THREAD_NUMBER))
     pool.close()
     pool.join()
-    return [result for result in results if result]
-
-
-def ensure_db_setup(db_path=DB_PATH):
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-
-    try:
-        c.execute("""
-            CREATE TABLE data (word text PRIMARY KEY UNIQUE, definition text, usage text);
-        """)
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
-    finally:
-        conn.close()
-
-
-def sanitise(s):
-    return s.replace("'", "''")
-
-
-def to_db(data, db_path=DB_PATH):
-    ensure_db_setup(db_path)
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    for row in data:
-        query = """
-            INSERT OR IGNORE INTO data (
-              word,
-              definition,
-              usage
-            ) VALUES ('{word}', '{definition}', '{usage}');
-        """.format(**{key: sanitise(value) for key, value in row.items()})
-
-        c.execute(query)
-
-    conn.commit()
-    conn.close()
+    return results
 
 
 if __name__ == '__main__':
     data_no_usage = get_rows()
     data = get_usages(data_no_usage)
-    to_db(data)
+    with open('wordList.json', 'w') as f:
+        json.dump(data, f, sort_keys=True, indent=2)
